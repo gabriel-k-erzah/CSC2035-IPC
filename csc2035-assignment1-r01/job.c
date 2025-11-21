@@ -1,6 +1,6 @@
 /*
  * Replace the following string of 0s with your student number
- * 000000000
+ * 240242385
  */
 #include <stdlib.h>
 #include <string.h>
@@ -15,11 +15,13 @@ job_t* job_new(pid_t pid, unsigned int id, unsigned int priority,
     return job_set((job_t*) malloc(sizeof(job_t)), pid, id, priority, label);
 }
 
-/* 
- * TODO: you must implement this function
- */
-job_t* job_copy(job_t* src, job_t* dst) {    
-    return src;
+job_t* job_copy(job_t* src, job_t* dst) {
+    if (src == NULL) {return NULL;}
+    //if(strlen(src->label) != MAX_NAME_SIZE - 1){return NULL;}
+    if (dst == src) {return dst;}
+    if (dst == NULL) {job_t* newjob = job_new(src->pid, src->id, src->priority, src->label);return newjob;}
+    job_set(dst, src->pid, src->id, src->priority, src->label);
+    return dst;
 }
 
 /* 
