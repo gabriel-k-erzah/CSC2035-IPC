@@ -3,6 +3,8 @@
  * 240242385 */
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <errno.h>
 #include "joblog.h"
@@ -36,6 +38,8 @@ static char* new_log_name(proc_t* proc) {
  * if it does not already exist.
  */
 int joblog_init(proc_t* proc) {
+    int saved_errno = errno;
+
     if (!proc) {
         errno = EINVAL;
         return -1;
@@ -55,35 +59,136 @@ int joblog_init(proc_t* proc) {
         }
     }
 
-    joblog_delete(proc);    // in case log exists for proc
+    joblog_delete(proc);
     
     return r;
 }
 
-/* 
- * TODO: you must implement this function.
- * Hints:
- * - you have to go to the beginning of the line represented
- *      by entry_num to read the required entry
- * - see job.h for a function to create a job from its string representation
- */
 job_t* joblog_read(proc_t* proc, int entry_num, job_t* job) {
-    return NULL;
+    if (!proc || entry_num < 0) {
+        return NULL;
+    }
+
+    int saved_errno = errno;
+
+    char* log_name = new_log_name(proc);
+    if (!log_name) {
+        errno = saved_errno;
+        return NULL;
+    }
+
+    FILE* fp = fopen(log_name, "r");
+    if (!fp) {
+        free(log_name);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    long offset = (long)entry_num * JOB_STR_SIZE;
+    if (fseek(fp, offset, SEEK_SET) != 0) {
+        fclose(fp);
+        free(log_name);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    char buf[JOB_STR_SIZE + 1];
+    size_t nread = fread(buf, 1, JOB_STR_SIZE, fp);
+    fclose(fp);
+    free(log_name);
+
+    if (nread != (size_t)JOB_STR_SIZE) {
+        errno = saved_errno;
+        return NULL;
+    }
+
+    if (buf[JOB_STR_SIZE - 1] != '\n') {
+        errno = saved_errno;
+        return NULL;
+    }
+    buf[JOB_STR_SIZE - 1] = '\0';
+
+    job_t* result = str_to_job(buf, job);
+    if (!result) {
+        errno = saved_errno;
+        return NULL;
+    }
+
+    errno = saved_errno;
+    return result;
 }
 
-/* 
- * TODO: you must implement this function.
- * Hints:
- * - remember new entries are appended to a log file
- * - see the hint for joblog_read
- */
 void joblog_write(proc_t* proc, job_t* job) {
-    return;
+
+    if (!proc || !job) {
+        return;
+    }
+
+    int saved_errno = errno;
+
+    char* log_name = new_log_name(proc);
+    if (!log_name) {
+        errno = saved_errno;
+        return;
+    }
+
+    FILE* fp = fopen(log_name, "a");
+    if (!fp) {
+        free(log_name);
+        errno = saved_errno;
+        return;
+    }
+
+    /* Get string representation of job (without newline) */
+    char* jstr = job_to_str(job, NULL);
+    if (!jstr) {
+        fclose(fp);
+        free(log_name);
+        errno = saved_errno;
+        return;
+    }
+
+    size_t len = strlen(jstr);
+
+    if (len != (size_t)(JOB_STR_SIZE - 1)) {
+        free(jstr);
+        fclose(fp);
+        free(log_name);
+        errno = saved_errno;
+        return;
+    }
+
+
+    size_t nw1 = fwrite(jstr, 1, len, fp);
+    size_t nw2 = fwrite("\n", 1, 1, fp);
+
+    free(jstr);
+    fclose(fp);
+    free(log_name);
+
+    if (nw1 != len || nw2 != 1) {
+        errno = saved_errno;
+        return;
+    }
+
+    errno = saved_errno;
 }
 
-/* 
- * TODO: you must implement this function.
- */
 void joblog_delete(proc_t* proc) {
-    return;
+    if (!proc) {
+        return;
+    }
+
+    int saved_errno = errno;
+
+    char* log_name = new_log_name(proc);
+    if (!log_name) {
+        errno = saved_errno;
+        return;
+    }
+
+    (void)unlink(log_name);
+
+    free(log_name);
+    errno = saved_errno;
 }
