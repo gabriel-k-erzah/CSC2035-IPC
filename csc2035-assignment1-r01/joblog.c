@@ -1,7 +1,6 @@
 /*
  * Replace the following string of 0s with your student number
- * 000000000
- */
+ * 240242385 */
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/stat.h>
